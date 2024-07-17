@@ -1,0 +1,165 @@
+# @Author: Your name
+# @Date:   1970-01-01 01:00:00
+# @Last Modified by:   Your name
+# @Last Modified time: 2022-04-19 15:00:42
+
+MODEL: sit
+RECONSTRUCTION: False
+SSL: smae
+SERVER: False
+
+##################################  DATA & TASK  ##################################
+
+mesh_resolution:
+  ico_mesh: 6 #resolution of the input mesh
+  ico_grid: 2 #resolution of the grid used to extract patches
+  sampling: msm #sampling used for mesh resampling and patch extraction #msm or wb
+  reorder: False #reorder the sequence of patches
+
+ico_0_grid:
+    num_patches: 20 
+    num_vertices: 2145
+
+ico_1_grid:
+    num_patches: 80 
+    num_vertices: 561 
+
+ico_2_grid:
+    num_patches: 320 
+    num_vertices: 153 
+
+ico_3_grid:
+    num_patches: 1280
+    num_vertices: 45
+
+ico_4_grid:
+    num_patches: 5120
+    num_vertices: 15
+
+ico_5_grid:
+    num_patches: 20480
+    num_vertices: 5
+
+data:
+  path_to_data: /drive/data #/drive/data, /home/sd20/data
+  path_to_template: /home/sd20/data/template_spheres
+  path_to_workdir: /home/sd20/workspace/sMAE
+  dataset: UKB #dHCP, HCP, UKB
+  registration: msmall #msmsulc, msmall
+  dataloader: metrics #metrics, numpy
+  task: scan_age #scan_age, birth_age, scan_age_msmall,
+  configuration: template
+  masking: True #for dHCP only; True to mask the cut. 
+  hemi: half #half, full
+  normalise: False #standardise-vertex-wise,standardise-channel-wise,False, sub-normalise, group-standardise,sub-standardise
+  modality: cortical_metrics #cortical_metrics, fMRI, memory_task
+  clipping: True # False
+  folder_to_dhcp: metrics/ico_6_msm/base/regression_{}_space_features
+  low_train: 0 #set the number of trianing samples;0 means off
+  data_harmonisation: False
+
+logging:
+  folder_to_save_model: "{}/logs/{}/{}/{}/{}/{}/SiT/ico_grid_{}/{}" #{dataset},{modality},{task},{grid resolution},{configuration}
+
+###################################  MODEL  ####################################
+
+transformer:
+  dim: 192 #192, 384, 768
+  depth: 12 #12, 12, 12
+  heads: 3 #3, 6, 12
+  pool: 'cls'  # 'cls' or 'mean'
+  num_classes: 1
+  channels: [0]
+  dim_head: 64 #64
+  dropout: 0.0
+  emb_dropout: 0.0
+  use_pos_embedding: 'sin-cos' #'trainable', 'sin-cos', False
+  use_class_token: False #for mae:True (but not used)
+  trainable_pos_emb: False #False #only for use_pos_embedding=trainable
+  no_class_token_emb: True #for vsMAE set to TRUE! not using classification token position embedding
+  init_weights_layers: False #True
+
+
+##################################  TRAINING  ###################################
+
+training:
+  LR: 0.0003
+  bs: 8
+  bs_val: 1
+  iterations: 1000
+  log_training_it: 10 #default 5, fMRI 1
+  log_val_it: 20
+  gpu: 1
+  restart: False
+  early_stopping: False
+  init_weights: False #ssl, imagenet or False
+  finetuning: True
+  use_confounds: False
+  path_from_ckpt: '../logs/ViT/pretraining/HCP/res_ico6_sub_ico2/2021-11-28-11:37:58-tiny/pretrained-net-final.pt'
+  use_cross_validation: False
+  sampler: False
+  runtime: False
+  
+pretraining_mpp:
+  mask_prob: 0.75 #0.5
+  replace_prob: 0.8 #0.8
+  swap_prob: 0.02 #0.02
+
+pretraining_mae:
+  mask_prob: 0.90
+  decoder_dim: 192 
+  decoder_depth: 3 
+  decoder_heads: 3
+  decoder_dim_head: 64
+  use_pos_embedding_decoder: True
+  use_all_patch_loss: False #False
+  loss: mse #mse, l1 smoothl1
+  init_weights: False #False
+  save_reconstruction: True
+
+pretraining_smae:
+  mask_prob: 0.75
+  decoder_dim: 192 
+  decoder_depth: 3 
+  decoder_heads: 3
+  decoder_dim_head: 64
+  init_weights: False #False
+  save_reconstruction: True
+  use_class_token_dec: False
+  no_pos_emb_class_token_decoder: True
+
+augmentation: # prob of augmentation techniques need to sum to 1
+  prob_augmentation: 0.0  #probability of using any of the augmentation technique; 0.0 to not use any augmentation
+  prob_rotation: 1.0 #use rotation
+  max_abs_deg_rotation: 15
+  prob_warping: 0.0 #use non-linear warping
+  prob_shuffle: 0.0 #use shuffling of patches
+  warp_ico: 2
+
+##################################  OPTIMISATION  ##################################
+
+optimisation:
+  optimiser: AdamW #SGD, Adam, AdamW
+  use_scheduler: False
+  scheduler: CosineDecay  # CosineDecay, StepLR
+  warmup: False
+  nbr_step_warmup: 100
+
+SGD:
+  weight_decay: 0.0 #default 0.0
+  momentum: 0.9 #default 0.
+  nesterov: False
+
+Adam:
+  weight_decay: 0.01  #default 0.0
+
+AdamW:
+  weight_decay: 0.01  #default 0.01
+  
+StepLR: 
+  stepsize: 100
+  decay: 0.5
+
+CosineDecay:
+  T_max: 50  # number of iteration to go from high to low
+  eta_min: 0.00001 #minimum learning rate
